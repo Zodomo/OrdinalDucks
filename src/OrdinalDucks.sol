@@ -30,6 +30,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     uint256 public nftCount = 1;
     uint256 public wlTimestamp;
     mapping(uint256 => mapping(address => bool)) public isWhitelisted;
+    string public baseURI;
 
     mapping(uint256 => address) private _burner;
     mapping(uint256 => string) private _burnAddress;
@@ -43,7 +44,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
 
     // Confirm the msg.sender has mint privileges
     modifier mintable() {
-        require(nftCount <= 150, "NFT supply cap reached!");
+        require(nftCount < 151, "NFT supply cap reached!");
         require(wlTimestamp > 0, "Whitelist not initiated!");
         if (isWhitelisted[0][msg.sender]) { _; }
         else if (isWhitelisted[1][msg.sender]) { _; }
@@ -58,6 +59,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     // Zodomo's address is the only wallet address than can mint two
     modifier mintLimit() {
         if (msg.sender == _zodomoWallet && balanceOf(msg.sender) < 2) { _; }
+        if (msg.sender == _auctionWallet && balanceOf(msg.sender) < 30) { _; }
         else if (balanceOf(msg.sender) == 0) { _; }
         else { revert("You've already minted your allocation!"); }
     }
@@ -66,6 +68,11 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     modifier tokenHolder(uint256 _tokenId) {
         if (ownerOf(_tokenId) == msg.sender || _burner[_tokenId] == msg.sender) { _; }
         else { revert("You do not own this token!"); }
+    }
+
+    modifier auctioneer() {
+        require(msg.sender == _auctionWallet, "Only auction wallet can call this function!");
+        _;
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,6 +101,11 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
                 INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
+    // _baseURI() override to load from storage
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
+    }
+
     // Swap out auction wallet address
     function _changeAuctionWallet(address _address) internal {
         require(_auctionWallet != _address, "Address is already auction wallet!");
@@ -104,6 +116,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
 
     // Consume whitelist allocation, removing msg.sender from whitelist
     function _consumeWL(address _address) internal {
+        if (_address == _zodomoWallet || _address == _auctionWallet) { return; }
         for (uint i = 0; i < 5;) {
             if (isWhitelisted[i][_address]) {
                 isWhitelisted[i][_address] = false;
@@ -116,6 +129,12 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 RESTRICTED FUNCTIONS
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+    // Change base URI
+    function changeBaseURI_(string memory _newBaseURI) public onlyOwner {
+        require(bytes(_newBaseURI).length > 0, "New baseURI missing!");
+        baseURI = _newBaseURI;
+    }
 
     // Change whitelist timestamp. Must be set 60 minutes into the future or further.
     function setWLTimestamp_(uint256 _timestamp) public onlyOwner {
@@ -151,6 +170,16 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
         }
     }
 
+    // Handle auction wallet batch mint
+    function auctionBatchMint_() public mintable auctioneer {
+        uint256 auctioneerBalance = balanceOf(_auctionWallet);
+        for (uint256 i; i < 30 - auctioneerBalance;) {
+            _safeMint(_auctionWallet, nftCount);
+            ++nftCount;
+            unchecked { ++i; }
+        }
+    }
+
     // Retrieve burner's Bitcoin address to receive their respective inscription
     function getBurnAddress_(uint256 _tokenId) public view onlyOwner returns (string memory) {
         return _burnAddress[_tokenId];
@@ -179,5 +208,14 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
         else {
             _burnAddress[_tokenId] = _btcAddress;
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////////////////////////////////////////
+                MISCELLANEOUS FUNCTIONS
+    //////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+    function tokenURI(uint256 _tokenId) public view override returns (string memory) {
+        require(_tokenId > 0 && _tokenId <= 151, "Token ID is out of range!");
+        return super.tokenURI(_tokenId);
     }
 }
