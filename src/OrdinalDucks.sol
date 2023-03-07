@@ -28,6 +28,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     uint256 private _nftCount = 0;
     bool private _auctionMinted;
     bool private _zodomoMinted;
+    bool private _randomized;
     mapping(uint256 => address) private _burner;
     mapping(uint256 => string) private _burnAddress;
     address private _auctionWallet = 0xdC25314F47b6F11728Baf41C8f3Fa0cD3f4D9E01;
@@ -86,7 +87,6 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
                 LIBRARY
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    // TODO: Verify more than just the prefix
     // Confirm the supplied Bitcoin address is the taproot version
     function checkTaprootAddress(string memory _btcAddress) public view returns (bool) {
         bytes memory btcAddress = bytes(_btcAddress);
@@ -239,7 +239,12 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
     function tokenURI(uint256 _tokenId) public view override returns (string memory) {
-        require(_tokenId > 0 && _tokenId <= 151, "Token ID is out of range!");
-        return super.tokenURI(_tokenId);
+        require(_tokenId > 0 && _tokenId <= 150, "Token ID is out of range!");
+        if (!_randomized) {
+            return super.tokenURI(0);
+        }
+        else {
+            return super.tokenURI(_tokenId);
+        }
     }
 }
