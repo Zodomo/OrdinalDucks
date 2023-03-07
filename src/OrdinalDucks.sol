@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import "openzeppelin-contracts/access/Ownable2Step.sol";
 import "openzeppelin-contracts/security/ReentrancyGuard.sol";
-import "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import "openzeppelin-contracts/token/ERC721/ERC721.sol";
 
 // TODO: Distribution
-// Auction is 29 Grailed 
+// Auction is 29 Grailed
 // Zodomo is 1 Grailed
 // Mods + zodomo are 5 from special/public
 // Public is 115
 
-// TODO: Implement WBTC quoting/swapping
+// 30 Grailed
+// 22 Special
+// 98 Standard
+// 150 Total
 
 /// @title An ERC721 contract that mints placeholder NFTs that a recipient can burn alongside providing a Bitcoin address for the team to manually send their ordinal to.
 /// @author Zodomo
@@ -23,18 +25,21 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
                 EVENTS & ERRORS
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
+    event Whitelist(address indexed _address, uint256 indexed _tier, bool indexed _bool);
+
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 STORAGE
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    uint256 public nftCount = 1;
+    uint256 public nftCount = 0;
     uint256 public wlTimestamp;
-    mapping(uint256 => mapping(address => bool)) public isWhitelisted;
+    mapping(uint256 => mapping(address => bool)) public whitelist;
+    mapping(address => bool) public isWhitelisted;
     string public baseURI;
 
     mapping(uint256 => address) private _burner;
     mapping(uint256 => string) private _burnAddress;
-    address private _auctionWallet;
+    address private _auctionWallet = 0xdC25314F47b6F11728Baf41C8f3Fa0cD3f4D9E01;
     address private constant _zodomoWallet = 0xA779fC675Db318dab004Ab8D538CB320D0013F42;
     bytes1[4] private taprootPrefix = [bytes1('b'),bytes1('c'),bytes1('1'),bytes1('p')];
 
@@ -46,22 +51,22 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     modifier mintable() {
         require(nftCount < 151, "NFT supply cap reached!");
         require(wlTimestamp > 0, "Whitelist not initiated!");
-        if (isWhitelisted[0][msg.sender]) { _; }
-        else if (isWhitelisted[1][msg.sender]) { _; }
-        else if (isWhitelisted[2][msg.sender] && block.timestamp >= wlTimestamp) { _; }
-        else if (isWhitelisted[3][msg.sender] && block.timestamp >= (wlTimestamp + 30 minutes)) { _; }
-        else if (isWhitelisted[4][msg.sender] && block.timestamp >= (wlTimestamp + 60 minutes)) { _; }
-        else if (block.timestamp >= (wlTimestamp + 90 minutes)) { _; }
+        require(block.timestamp >= wlTimestamp, "Whitelist timestamp not reached!");
+        if (whitelist[0][msg.sender]) { _; } // Auction WL mints
+        else if (whitelist[1][msg.sender]) { _; } // One WL mint
+        else if (whitelist[2][msg.sender]) { _; } // Two WL mints
+        else if (whitelist[3][msg.sender] && block.timestamp >= wlTimestamp + 60 minutes) { _; } // Waddler WL
+        else if (block.timestamp >= (wlTimestamp + 105 minutes)) { _; } // Decoy WL / General Mint
         else { revert("Mint conditions are not met!"); }
     }
 
-    // Impose one mint per wallet limit
-    // Zodomo's address is the only wallet address than can mint two
+    // Impose mint limit based on WL tier
     modifier mintLimit() {
-        if (msg.sender == _zodomoWallet && balanceOf(msg.sender) < 2) { _; }
-        if (msg.sender == _auctionWallet && balanceOf(msg.sender) < 30) { _; }
-        else if (balanceOf(msg.sender) == 0) { _; }
-        else { revert("You've already minted your allocation!"); }
+        if (whitelist[0][msg.sender] && balanceOf(msg.sender) < 30) { _; }
+        else if (whitelist[2][msg.sender] && balanceOf(msg.sender) < 2) { _; }
+        else if ((whitelist[1][msg.sender] || whitelist[3][msg.sender]) && balanceOf(msg.sender) < 1) { _; }
+        else if (block.timestamp >= (wlTimestamp + 105 minutes) && balanceOf(msg.sender) < 1) { _; }
+        else { revert("Mint limitation hit!"); }
     }
 
     // Confirm the msg.sender either owns the _tokenId NFT or previously burned it
@@ -70,6 +75,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
         else { revert("You do not own this token!"); }
     }
 
+    // Confirm the msg.sender is the auction wallet
     modifier auctioneer() {
         require(msg.sender == _auctionWallet, "Only auction wallet can call this function!");
         _;
@@ -79,7 +85,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
                 CONSTRUCTOR
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    constructor() ERC721("Ordinal Ducks", "OrdinalDucksNFT") payable { }
+    constructor() ERC721("Ordinal Ducks", "ORDINALDUCKS") payable { }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 LIBRARY
@@ -109,21 +115,10 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     // Swap out auction wallet address
     function _changeAuctionWallet(address _address) internal {
         require(_auctionWallet != _address, "Address is already auction wallet!");
-        isWhitelisted[1][_auctionWallet] = false;
+        whitelist[0][_auctionWallet] = false;
+        emit Whitelist(_auctionWallet, 0, false);
         _auctionWallet = _address;
-        isWhitelisted[1][_auctionWallet] = true;
-    }
-
-    // Consume whitelist allocation, removing msg.sender from whitelist
-    function _consumeWL(address _address) internal {
-        if (_address == _zodomoWallet || _address == _auctionWallet) { return; }
-        for (uint i = 0; i < 5;) {
-            if (isWhitelisted[i][_address]) {
-                isWhitelisted[i][_address] = false;
-                break;
-            }
-            unchecked { ++i; }
-        }
+        whitelist[0][_auctionWallet] = true;
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -136,46 +131,49 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
         baseURI = _newBaseURI;
     }
 
-    // Change whitelist timestamp. Must be set 60 minutes into the future or further.
+    // Change whitelist timestamp
     function setWLTimestamp_(uint256 _timestamp) public onlyOwner {
-        require(_timestamp >= (block.timestamp + 60 minutes), "Timestamp is too close!");
+        require(_timestamp > block.timestamp, "Timestamp not in future!");
         wlTimestamp = _timestamp;
     }
 
     // Assign an address to a specific whitelist tier
+    // Calling on an address a second time will remove whitelist
     function whitelistAddress_(address _address, uint256 _tier) public onlyOwner {
+        // Retrieve current whitelist status
+        bool wlStatus = whitelist[_tier][_address];
+        // If tier 0 (auction) is set, change auction address
         if (_tier == 0) {
-            for (uint i = 1; i < 5;) {
-                if (isWhitelisted[i][_address]) {
-                    revert("A team wallet cannot have another whitelist!");
-                }
-            }
-            isWhitelisted[_tier][_address] = !isWhitelisted[_tier][_address];
-        }
-        else if (_tier == 1) {
-            for (uint i = 0; i < 5;) {
-                if (isWhitelisted[i][_address]) {
-                    revert("The auction wallet cannot have another whitelist!");
-                }
-            }
             _changeAuctionWallet(_address);
         }
-        else if (_tier > 1 && _tier < 5) {
-            require(!isWhitelisted[0][_address], "Team wallets cannot be added to general whitelist!");
-            require(!isWhitelisted[1][_address], "Auction wallet cannot be added to general whitelist!");
-            isWhitelisted[_tier][_address] = !isWhitelisted[_tier][_address];
+        // For all other tiers, either set or remove whitelist
+        else if (_tier > 0 && _tier < 4) {
+            // If not whitelisted for this tier, proceed
+            if (!wlStatus) {
+                // Confirm address is not in any other whitelist tier
+                require(!isWhitelisted[_address], "Address already whitelisted!");
+                // Set whitelist tier and whitelist status
+                whitelist[_tier][_address] = !wlStatus;
+                isWhitelisted[_address] = !wlStatus;
+            }
+            // If address is in this whitelist tier, remove whitelist and whitelist status
+            else {
+                whitelist[_tier][_address] = !wlStatus;
+                isWhitelisted[_address] = !wlStatus;
+            }
         }
         else {
             revert("Invalid WL tier!");
         }
+        // Emit event detailing whitelist tier and change of whitelist status
+        emit Whitelist(_address, _tier, !wlStatus);
     }
 
     // Handle auction wallet batch mint
-    function auctionBatchMint_() public mintable auctioneer {
+    function auctionBatchMint_() public mintable mintLimit auctioneer {
         uint256 auctioneerBalance = balanceOf(_auctionWallet);
         for (uint256 i; i < 30 - auctioneerBalance;) {
-            _safeMint(_auctionWallet, nftCount);
-            ++nftCount;
+            safeMint();
             unchecked { ++i; }
         }
     }
@@ -190,11 +188,9 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
     // Safely (ensure recipient can receive ERC721 tokens) mint NFT token
-    // Only one mint per address except for Zodomo
     function safeMint() public mintable mintLimit nonReentrant {
-        _consumeWL(msg.sender);
-        _safeMint(msg.sender, nftCount);
         ++nftCount;
+        _safeMint(msg.sender, nftCount);
     }
 
     // Burn _tokenId NFT in exchange for Bitcoin address
