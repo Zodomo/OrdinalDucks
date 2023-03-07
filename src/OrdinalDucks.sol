@@ -5,17 +5,6 @@ import "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import "openzeppelin-contracts/access/Ownable2Step.sol";
 import "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
-// TODO: Distribution
-// Auction is 29 Grailed
-// Zodomo is 1 Grailed
-// Mods + zodomo are 5 from special/public
-// Public is 115
-
-// 30 Grailed
-// 22 Special
-// 98 Standard
-// 150 Total
-
 /// @title An ERC721 contract that mints placeholder NFTs that a recipient can burn alongside providing a Bitcoin address for the team to manually send their ordinal to.
 /// @author Zodomo
 /// @notice This contract is designed with the idea in mind that the team would be manually managing sending ordinals to their recipients as to avoid using complicated technologies like the Emblem Vaults.
@@ -31,12 +20,14 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
                 STORAGE
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    uint256 public nftCount = 0;
     uint256 public wlTimestamp;
     mapping(uint256 => mapping(address => bool)) public whitelist;
     mapping(address => bool) public isWhitelisted;
     string public baseURI;
-
+    
+    uint256 private _nftCount = 0;
+    bool private _auctionMinted;
+    bool private _zodomoMinted;
     mapping(uint256 => address) private _burner;
     mapping(uint256 => string) private _burnAddress;
     address private _auctionWallet = 0xdC25314F47b6F11728Baf41C8f3Fa0cD3f4D9E01;
@@ -49,7 +40,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
 
     // Confirm the msg.sender has mint privileges
     modifier mintable() {
-        require(nftCount < 151, "NFT supply cap reached!");
+        require(_nftCount < 150, "NFT supply cap reached!");
         require(wlTimestamp > 0, "Whitelist not initiated!");
         require(block.timestamp >= wlTimestamp, "Whitelist timestamp not reached!");
         if (whitelist[0][msg.sender]) { _; } // Auction WL mints
@@ -78,6 +69,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     // Confirm the msg.sender is the auction wallet
     modifier auctioneer() {
         require(msg.sender == _auctionWallet, "Only auction wallet can call this function!");
+        require(_zodomoMinted, "Zodomo hasn't minted yet!");
         _;
     }
 
@@ -85,7 +77,10 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
                 CONSTRUCTOR
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    constructor() ERC721("Ordinal Ducks", "ORDINALDUCKS") payable { }
+    constructor() ERC721("Ordinal Ducks", "ORDINALDUCKS") payable {
+        whitelist[0][_auctionWallet] = true;
+        whitelist[2][_zodomoWallet] = true;
+    }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 LIBRARY
@@ -101,6 +96,19 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
             }
         }
         return true;
+    }
+
+    // Return max supply
+    function maxSupply() public pure returns (uint256) {
+        return 150;
+    }
+
+    // Return current supply
+    function currentSupply() public view returns (uint256) {
+        uint256 supply = _nftCount;
+        if (_auctionMinted) { supply += 29; }
+        if (_zodomoMinted) { supply += 1; }
+        return supply;
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +127,36 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
         emit Whitelist(_auctionWallet, 0, false);
         _auctionWallet = _address;
         whitelist[0][_auctionWallet] = true;
+    }
+
+    // Process mint logic/distribution for different whitelist tiers
+    function _mintRouter() internal {
+        // If auction wallet is msg.sender, process auction mint logic
+        if (whitelist[0][msg.sender]) {
+            _auctionBatchMint();
+        }
+        // Allocate one randomized grailed mint to Zodomo
+        else if (msg.sender == _zodomoWallet && balanceOf(_zodomoWallet) < 1) {
+            _safeMint(_zodomoWallet, 120 + (block.difficulty % 30));
+            _zodomoMinted = true;
+        }
+        // Process mints for everyone else
+        // Restrictions are pre-imposed before the mint routing logic
+        else {
+            ++_nftCount;
+            _safeMint(msg.sender, _nftCount);
+        }
+    }
+
+    // Handle auction wallet batch mint
+    function _auctionBatchMint() internal auctioneer {
+        uint256 auctioneerBalance = balanceOf(_auctionWallet);
+        for (uint256 i = 121; i < 151 - auctioneerBalance;) {
+            if (ownerOf(i) == _zodomoWallet) { continue; }
+            _safeMint(_auctionWallet, i);
+            unchecked { ++i; }
+        }
+        _auctionMinted = true;
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,15 +207,6 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
         emit Whitelist(_address, _tier, !wlStatus);
     }
 
-    // Handle auction wallet batch mint
-    function auctionBatchMint_() public mintable mintLimit auctioneer {
-        uint256 auctioneerBalance = balanceOf(_auctionWallet);
-        for (uint256 i; i < 30 - auctioneerBalance;) {
-            safeMint();
-            unchecked { ++i; }
-        }
-    }
-
     // Retrieve burner's Bitcoin address to receive their respective inscription
     function getBurnAddress_(uint256 _tokenId) public view onlyOwner returns (string memory) {
         return _burnAddress[_tokenId];
@@ -189,8 +218,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
 
     // Safely (ensure recipient can receive ERC721 tokens) mint NFT token
     function safeMint() public mintable mintLimit nonReentrant {
-        ++nftCount;
-        _safeMint(msg.sender, nftCount);
+        _mintRouter();
     }
 
     // Burn _tokenId NFT in exchange for Bitcoin address
