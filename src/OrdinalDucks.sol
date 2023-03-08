@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import "openzeppelin-contracts/token/ERC721/ERC721.sol";
-import "openzeppelin-contracts/access/Ownable2Step.sol";
+import "openzeppelin-contracts/access/Ownable.sol";
 import "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
 // TODO: Implement mint costs
@@ -10,7 +10,7 @@ import "openzeppelin-contracts/security/ReentrancyGuard.sol";
 /// @title An ERC721 contract that mints placeholder NFTs that a recipient can burn alongside providing a Bitcoin address for the team to manually send their ordinal to.
 /// @author Zodomo
 /// @notice This contract is designed with the idea in mind that the team would be manually managing sending ordinals to their recipients as to avoid using complicated technologies like the Emblem Vaults.
-contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
+contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 EVENTS & ERRORS
@@ -26,12 +26,13 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     uint256 public wlTimestamp;
     mapping(uint256 => mapping(address => bool)) public whitelist;
     mapping(address => bool) public isWhitelisted;
+    mapping(uint256 => address) public _burner;
+    bool public mintCompleted;
     string public baseURI;
     
     uint256 private _nftCount = 0;
     bool private _auctionMinted;
     bool private _devMinted;
-    mapping(uint256 => address) private _burner;
     mapping(uint256 => string) private _burnAddress;
     address private _auctionWallet;
     address private _devWallet;
@@ -44,10 +45,8 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     // Confirm the msg.sender has mint privileges
     modifier mintable() {
         require(_nftCount < maxSupply, "NFT supply cap reached!");
-        require(wlTimestamp > 0, "Whitelist not initiated!");
-        require(block.timestamp >= wlTimestamp, "Whitelist timestamp not reached!");
         if (whitelist[0][msg.sender]) { _; } // Auction WL mints
-        else if (whitelist[1][msg.sender]) { _; } // One WL mint
+        else if (whitelist[1][msg.sender]) { _; } // One / OG WL mint
         else if (whitelist[2][msg.sender]) { _; } // Dev / Top D's 2 WL mints
         else if (whitelist[3][msg.sender] && block.timestamp >= wlTimestamp + 60 minutes) { _; } // Waddler WL
         else if (block.timestamp >= (wlTimestamp + 105 minutes)) { _; } // Decoy / General Mint
@@ -65,13 +64,13 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
 
     // Require mint is complete
     modifier mintComplete() {
-        require(currentSupply() == maxSupply, "Mint cap not reached!");
+        require(mintCompleted, "Mint cap not reached!");
         _;
     }
 
     // Confirm the msg.sender either owns the _tokenId NFT or previously burned it
     modifier tokenHolder(uint256 _tokenId) {
-        if (ownerOf(_tokenId) == msg.sender || _burner[_tokenId] == msg.sender) { _; }
+        if (_ownerOf(_tokenId) == msg.sender || _burner[_tokenId] == msg.sender) { _; }
         else { revert("You do not own this token!"); }
     }
 
@@ -86,13 +85,19 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
                 CONSTRUCTOR
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    constructor(address _auction, address _dev, string memory _uri) ERC721("Ordinal Ducks", "ORDINALDUCKS") payable {
+    constructor(
+        address _auction,
+        address _dev,
+        string memory _uri,
+        uint256 _timestamp
+    ) ERC721("Ordinal Ducks", "ORDINALDUCKS") payable {
         maxSupply = 150;
         whitelist[0][_auction] = true;
         whitelist[2][_dev] = true;
         _auctionWallet = _auction;
         _devWallet = _dev;
         baseURI = _uri;
+        setWLTimestamp_(_timestamp);
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -120,7 +125,7 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     }
 
     // Concatenate two strings for tokenURI
-    function concatenate(string memory _str1, string memory _str2) public pure returns (string memory) {
+    /* function concatenate(string memory _str1, string memory _str2) public pure returns (string memory) {
         bytes memory strBytes1 = bytes(_str1);
         bytes memory strBytes2 = bytes(_str2);
         bytes memory combinedBytes = new bytes(strBytes1.length + strBytes2.length);
@@ -131,6 +136,11 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
             combinedBytes[strBytes1.length + j] = strBytes2[j];
         }
         return string(combinedBytes);
+    } */
+
+    // Check if whitelisted
+    function checkWhitelist(uint256 _tier, address _address) public view returns (bool) {
+        return whitelist[_tier][_address];
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,10 +163,10 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
 
     // Handle auction wallet batch mint
     function _auctionBatchMint() internal auctioneer {
-        for (uint256 i = 121; i <= maxSupply;) {
-            if (ownerOf(i) == _devWallet) { continue; }
+        uint256 bal = 121 + balanceOf(msg.sender);
+        for (uint256 i = bal; i <= 150; i++) {
+            if (_ownerOf(i) == _devWallet) { continue; }
             _safeMint(_auctionWallet, i);
-            unchecked { ++i; }
         }
         _auctionMinted = true;
     }
@@ -166,13 +176,13 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
         uint256 index;
         for (uint256 i; i < 10;) {
             index = uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty, msg.sender, i))) % (121);
-            if (ownerOf(index) == address(0) && index > 0) {
+            if (_ownerOf(index) == address(0) && index > 0 && index <= 150) {
                 return index;
             }
             unchecked { ++i; }
         }
         for (uint256 i = 1; i <= 120;) {
-            if (ownerOf(i) == address(0)) {
+            if (_ownerOf(i) == address(0)) {
                 return i;
             }
             unchecked { ++i; }
@@ -181,22 +191,28 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     }
 
     // Process mint logic/distribution for different whitelist tiers
-    function _mintRouter() internal {
+    function _mintRouter() internal returns (uint256) {
         // If auction wallet is msg.sender, process auction mint logic
         if (whitelist[0][msg.sender]) {
             _auctionBatchMint();
+            if (currentSupply() == 150) { mintCompleted = true; }
+            return 0;
         }
         // Allocate one randomized grailed mint to dev
         else if (msg.sender == _devWallet && balanceOf(_devWallet) < 1) {
-            _safeMint(_devWallet, 121 + (uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty))) % 30));
+            uint256 tokenId = 121 + (uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty))) % 30);
+            _safeMint(_devWallet, tokenId);
             _devMinted = true;
-            ++_nftCount;
+            return tokenId;
         }
         // Process mints for everyone else
         // Restrictions are pre-imposed before the mint routing logic
         else {
-            _safeMint(msg.sender, _randomId());
+            uint256 tokenId = _randomId();
+            _safeMint(msg.sender, tokenId);
             ++_nftCount;
+            if (currentSupply() == 150) { mintCompleted = true; }
+            return tokenId;
         }
     }
 
@@ -258,17 +274,17 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
     // Safely (ensure recipient can receive ERC721 tokens) mint NFT token
-    function safeMint() public mintable mintLimit nonReentrant payable {
-        _mintRouter();
+    function safeMint() public mintable mintLimit nonReentrant payable returns (uint256) {
+        return _mintRouter();
     }
 
     // Burn _tokenId NFT in exchange for Bitcoin address
     function burn(uint256 _tokenId, string memory _btcAddress) public tokenHolder(_tokenId) {
         checkTaprootAddress(_btcAddress);
-        if (ownerOf(_tokenId) == msg.sender) {
-            _burn(_tokenId);
-            _burner[_tokenId] == msg.sender;
+        if (_ownerOf(_tokenId) == msg.sender) {
+            _burner[_tokenId] = msg.sender;
             _burnAddress[_tokenId] = _btcAddress;
+            _burn(_tokenId);
         }
         else {
             _burnAddress[_tokenId] = _btcAddress;
@@ -279,8 +295,12 @@ contract OrdinalDucks is ERC721, Ownable2Step, ReentrancyGuard {
                 MISCELLANEOUS FUNCTIONS
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
+    function contractURI() public pure returns (string memory) {
+        return "https://bafybeidtjbiz2czcpxktbacjaf4vopmpircvg76q7zbqjv6zkoxuar44r4.ipfs.nftstorage.link/contract.json";
+    }
+
     function tokenURI(uint256 _tokenId) public view override returns (string memory) {
         require(_tokenId > 0 && _tokenId <= maxSupply, "Token ID is out of range!");
-        return concatenate(super.tokenURI(_tokenId), ".png");
+        return super.tokenURI(_tokenId);
     }
 }
