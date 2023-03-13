@@ -1,7 +1,7 @@
 {
   "name": "Ordinal Ducks",
   "description": "Not your ordinary ducks. Each Ordinal Duck has an identical counterpart inscribed on BTC, burn to claim.",
-  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/130.png",
+  "image": "ipfs://QmWhH7dLCAKdyUcioFWmHf2udFyVmY2wC8LLw2EkHWxa5y/130.png",
   "external_link": "https://www.ordinalducks.com/",
   "seller_fee_basis_points": 500,
   "fee_recipient": "0xdC25314F47b6F11728Baf41C8f3Fa0cD3f4D9E01"

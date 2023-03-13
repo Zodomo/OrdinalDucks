@@ -10,7 +10,7 @@ import "openzeppelin-contracts/security/ReentrancyGuard.sol";
 /// @title An ERC721 contract that mints placeholder NFTs that a recipient can burn alongside providing a Bitcoin address for the team to manually send their ordinal to.
 /// @author Zodomo
 /// @notice This contract is designed with the idea in mind that the team would be manually managing sending ordinals to their recipients as to avoid using complicated technologies like the Emblem Vaults.
-contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
+contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 EVENTS & ERRORS
@@ -99,7 +99,7 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         string memory _uri,
         uint256 _timestamp,
         uint256 _mintPrice
-    ) ERC721("Ordinal Ducks", "ORDINALDUCKS") payable {
+    ) ERC721("Ordinal Ducks Test", "ORDINALDUCKSTEST") payable {
         maxSupply = 150;
         whitelist[0][_auction] = true;
         whitelist[2][_dev] = true;
@@ -134,6 +134,19 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         if (_auctionMinted) { supply += 29; }
         if (_devMinted) { supply += 1; }
         return supply;
+    }
+
+    // Return mint price for buildship interface
+    function viewMintPrice() public view returns (uint) {
+        return mintPrice;
+    }
+
+    // Return wallet mint cap for buildship interface
+    function viewMintCap() public view returns (uint) {
+        if (msg.sender == _auctionWallet) { return 30; }
+        else if (msg.sender == _devWallet) { return 2; }
+        else if (whitelist[2][msg.sender]) { return 2; }
+        else { return 1; }
     }
 
     // Check if whitelisted
@@ -305,8 +318,8 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
                 PUBLIC FUNCTIONS
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    // Safely (ensure recipient can receive ERC721 tokens) mint NFT token
-    function safeMint() public mintable mintLimit nonReentrant payable returns (uint256) {
+    // Mint NFT token
+    function mint() public mintable mintLimit nonReentrant payable returns (uint256) {
         if (!isPriceExempt[msg.sender]) {
             require(msg.value >= mintPrice, "Payment not sufficient!");
         }
@@ -330,8 +343,8 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
                 MISCELLANEOUS FUNCTIONS
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    function contractURI() public pure returns (string memory) {
-        return "https://bafybeidtjbiz2czcpxktbacjaf4vopmpircvg76q7zbqjv6zkoxuar44r4.ipfs.nftstorage.link/contract.json";
+    function contractURI() public view returns (string memory) {
+        return string(abi.encodePacked(_baseURI(), "contract.json"));
     }
 
     function tokenURI(uint256 _tokenId) public view override returns (string memory) {
