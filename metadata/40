@@ -1,0 +1,27 @@
+{
+  "name": "Ordinal Duck #40",
+  "description": "Not your ordinary ducks...",
+  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/40.png",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Pekin"
+    },
+    {
+      "trait_type": "Misc",
+      "value": "Soccer_Ball"
+    },
+    {
+      "trait_type": "Beak",
+      "value": "Normal"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Mohawk"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Sunglasses"
+    }
+  ]
+}

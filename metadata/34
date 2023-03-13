@@ -1,0 +1,27 @@
+{
+  "name": "Ordinal Duck #34",
+  "description": "Not your ordinary ducks...",
+  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/34.png",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Pekin"
+    },
+    {
+      "trait_type": "Misc",
+      "value": "None"
+    },
+    {
+      "trait_type": "Beak",
+      "value": "Mustache"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Crown"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Sunglasses"
+    }
+  ]
+}

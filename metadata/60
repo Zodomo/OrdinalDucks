@@ -1,0 +1,27 @@
+{
+  "name": "Ordinal Duck #60",
+  "description": "Not your ordinary ducks...",
+  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/60.png",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Pekin"
+    },
+    {
+      "trait_type": "Misc",
+      "value": "Egg"
+    },
+    {
+      "trait_type": "Beak",
+      "value": "Normal"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Poofball_Hat"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Normal"
+    }
+  ]
+}

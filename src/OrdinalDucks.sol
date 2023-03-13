@@ -24,9 +24,10 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
 
     uint256 public immutable maxSupply;
     uint256 public wlTimestamp;
+    uint256 public mintPrice;
     mapping(uint256 => mapping(address => bool)) public whitelist;
     mapping(address => bool) public isWhitelisted;
-    mapping(uint256 => address) public _burner;
+    mapping(address => bool) public isPriceExempt;
     bool public mintCompleted;
     string public baseURI;
     
@@ -34,6 +35,7 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
     bool private _auctionMinted;
     bool private _devMinted;
     mapping(uint256 => string) private _burnAddress;
+    mapping(uint256 => address) private _burner;
     address private _auctionWallet;
     address private _devWallet;
     bytes1[4] private taprootPrefix = [bytes1('b'),bytes1('c'),bytes1('1'),bytes1('p')];
@@ -48,7 +50,7 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         if (whitelist[0][msg.sender]) { _; } // Auction WL mints
         else if (whitelist[1][msg.sender]) { _; } // One / OG WL mint
         else if (whitelist[2][msg.sender]) { _; } // Dev / Top D's 2 WL mints
-        else if (whitelist[3][msg.sender] && block.timestamp >= wlTimestamp + 60 minutes) { _; } // Waddler WL
+        else if (whitelist[3][msg.sender] && block.timestamp >= (wlTimestamp + 60 minutes)) { _; } // Waddler WL
         else if (block.timestamp >= (wlTimestamp + 105 minutes)) { _; } // Decoy / General Mint
         else { revert("Mint conditions are not met!"); }
     }
@@ -81,6 +83,12 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         _;
     }
 
+    // Confirm whitelist is not yet active
+    modifier wlOff() {
+        require(block.timestamp < wlTimestamp, "Whitelist is already active!");
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 CONSTRUCTOR
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
@@ -89,15 +97,19 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         address _auction,
         address _dev,
         string memory _uri,
-        uint256 _timestamp
+        uint256 _timestamp,
+        uint256 _mintPrice
     ) ERC721("Ordinal Ducks", "ORDINALDUCKS") payable {
         maxSupply = 150;
         whitelist[0][_auction] = true;
         whitelist[2][_dev] = true;
         _auctionWallet = _auction;
         _devWallet = _dev;
+        isPriceExempt[_auction] = true;
+        isPriceExempt[_dev] = true;
         baseURI = _uri;
-        setWLTimestamp_(_timestamp);
+        wlTimestamp = _timestamp;
+        mintPrice = _mintPrice;
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,26 +129,12 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
     }
 
     // Return current supply
-    function currentSupply() public view returns (uint256) {
+    function totalSupply() public view returns (uint256) {
         uint256 supply = _nftCount;
         if (_auctionMinted) { supply += 29; }
         if (_devMinted) { supply += 1; }
         return supply;
     }
-
-    // Concatenate two strings for tokenURI
-    /* function concatenate(string memory _str1, string memory _str2) public pure returns (string memory) {
-        bytes memory strBytes1 = bytes(_str1);
-        bytes memory strBytes2 = bytes(_str2);
-        bytes memory combinedBytes = new bytes(strBytes1.length + strBytes2.length);
-        for (uint i = 0; i < strBytes1.length; i++) {
-            combinedBytes[i] = strBytes1[i];
-        }
-        for (uint j = 0; j < strBytes2.length; j++) {
-            combinedBytes[strBytes1.length + j] = strBytes2[j];
-        }
-        return string(combinedBytes);
-    } */
 
     // Check if whitelisted
     function checkWhitelist(uint256 _tier, address _address) public view returns (bool) {
@@ -195,7 +193,7 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         // If auction wallet is msg.sender, process auction mint logic
         if (whitelist[0][msg.sender]) {
             _auctionBatchMint();
-            if (currentSupply() == 150) { mintCompleted = true; }
+            if (totalSupply() == 150) { mintCompleted = true; }
             return 0;
         }
         // Allocate one randomized grailed mint to dev
@@ -211,7 +209,7 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
             uint256 tokenId = _randomId();
             _safeMint(msg.sender, tokenId);
             ++_nftCount;
-            if (currentSupply() == 150) { mintCompleted = true; }
+            if (totalSupply() == 150) { mintCompleted = true; }
             return tokenId;
         }
     }
@@ -226,15 +224,15 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         baseURI = _newBaseURI;
     }
 
-    // Change whitelist timestamp
-    function setWLTimestamp_(uint256 _timestamp) public onlyOwner {
+    // Change whitelist timestamp, locks after whitelist is active
+    function setWLTimestamp_(uint256 _timestamp) public wlOff onlyOwner {
         require(_timestamp > block.timestamp, "Timestamp not in future!");
         wlTimestamp = _timestamp;
     }
 
     // Assign an address to a specific whitelist tier
     // Calling on an address a second time will remove whitelist
-    function whitelistAddress_(address _address, uint256 _tier) public onlyOwner {
+    function whitelistAddress_(address _address, uint256 _tier) public wlOff onlyOwner {
         // Retrieve current whitelist status
         bool wlStatus = whitelist[_tier][_address];
         // If tier 0 (auction) is set, change auction address
@@ -264,9 +262,43 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         emit Whitelist(_address, _tier, !wlStatus);
     }
 
+    // whitelistAddress_ batch version
+    function whitelistAddressBatch_(address[] memory _addresses, uint256[] memory _tier) public wlOff onlyOwner {
+        require(_addresses.length == _tier.length, "Argument arrays are not of equal length!");
+        for (uint256 i; i < _addresses.length;) {
+            whitelistAddress_(_addresses[i], _tier[i]);
+            unchecked { ++i; }
+        }
+    }
+
     // Retrieve burner's Bitcoin address to receive their respective inscription
     function getBurnAddress_(uint256 _tokenId) public view onlyOwner returns (string memory) {
         return _burnAddress[_tokenId];
+    }
+
+    // Change the mint price, locks after whitelist is active
+    function changeMintPrice_(uint256 _price) public wlOff onlyOwner {
+        mintPrice = _price;
+    }
+
+    // Toggle price exemption for specified address
+    function togglePriceExempt_(address _address) public wlOff onlyOwner {
+        isPriceExempt[_address] = !isPriceExempt[_address];
+    }
+
+    // togglePriceExempt_() batch version
+    function togglePriceExemptBatch_(address[] memory _addresses) public wlOff onlyOwner {
+        for (uint256 i; i < _addresses.length;) {
+            togglePriceExempt_(_addresses[i]);
+            unchecked { ++i; }
+        }
+    }
+
+    // Withdraw function
+    function withdraw_(address _address) public onlyOwner {
+        address payable payee = payable(_address);
+        (bool success,) = payee.call{ value: address(this).balance }("");
+        require(success, "Withdraw failed!");
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -275,6 +307,9 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
 
     // Safely (ensure recipient can receive ERC721 tokens) mint NFT token
     function safeMint() public mintable mintLimit nonReentrant payable returns (uint256) {
+        if (!isPriceExempt[msg.sender]) {
+            require(msg.value >= mintPrice, "Payment not sufficient!");
+        }
         return _mintRouter();
     }
 

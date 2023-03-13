@@ -1,0 +1,27 @@
+{
+  "name": "Ordinal Duck #16",
+  "description": "Not your ordinary ducks...",
+  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/16.png",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Pekin"
+    },
+    {
+      "trait_type": "Misc",
+      "value": "Bowtie"
+    },
+    {
+      "trait_type": "Beak",
+      "value": "Key"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Fishin'_Hat"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Normal"
+    }
+  ]
+}

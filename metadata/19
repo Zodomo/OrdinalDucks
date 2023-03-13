@@ -1,0 +1,27 @@
+{
+  "name": "Ordinal Duck #19",
+  "description": "Not your ordinary ducks...",
+  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/19.png",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Mallard"
+    },
+    {
+      "trait_type": "Misc",
+      "value": "None"
+    },
+    {
+      "trait_type": "Beak",
+      "value": "Cigar"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Deerhunter_Hat"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Normal"
+    }
+  ]
+}

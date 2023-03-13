@@ -1,0 +1,27 @@
+{
+  "name": "Ordinal Duck #12",
+  "description": "Not your ordinary ducks...",
+  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/12.png",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Pekin"
+    },
+    {
+      "trait_type": "Misc",
+      "value": "None"
+    },
+    {
+      "trait_type": "Beak",
+      "value": "Normal"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Normal"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Monacle"
+    }
+  ]
+}

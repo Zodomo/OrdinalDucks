@@ -1,0 +1,27 @@
+{
+  "name": "Ordinal Duck #38",
+  "description": "Not your ordinary ducks...",
+  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/38.png",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Grey"
+    },
+    {
+      "trait_type": "Misc",
+      "value": "Apple"
+    },
+    {
+      "trait_type": "Beak",
+      "value": "Normal"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Fishin'_Hat"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Monacle"
+    }
+  ]
+}

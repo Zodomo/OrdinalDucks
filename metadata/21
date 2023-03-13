@@ -1,0 +1,27 @@
+{
+  "name": "Ordinal Duck #21",
+  "description": "Not your ordinary ducks...",
+  "image": "https://bafybeiflstlvibzc4vmjeiwkdvwyynwljdylzw2kyvhf7m3qzpvy7tn52q.ipfs.nftstorage.link/21.png",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Mallard"
+    },
+    {
+      "trait_type": "Misc",
+      "value": "Potion"
+    },
+    {
+      "trait_type": "Beak",
+      "value": "Mustache"
+    },
+    {
+      "trait_type": "Head",
+      "value": "Normal"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Sunglasses"
+    }
+  ]
+}

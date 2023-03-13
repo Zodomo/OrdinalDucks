@@ -17,9 +17,12 @@ contract OrdinalDucksLaboratory is DSTestPlus {
 
     function setUp() public {
         hevm.warp(1);
-        ordducks = new OrdinalDucks(addresses[0], addresses[1], "https://test.com/", 300);
+        ordducks = new OrdinalDucks(addresses[0], addresses[1], "https://test.com/", 300, 100 gwei);
         for (uint i; i < addresses.length; i++) {
-            hevm.deal(addresses[i], 100 ether);
+            hevm.deal(addresses[i], 5 ether);
+        }
+        for (uint i; i < 105; i++) {
+            hevm.deal(address(uint160(i)), 1000 gwei);
         }
     }
 
@@ -28,7 +31,7 @@ contract OrdinalDucksLaboratory is DSTestPlus {
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
     function testConstructor() public view {
-        ordducks.currentSupply();
+        ordducks.totalSupply();
         ordducks.maxSupply();
         ordducks.checkWhitelist(0, addresses[0]);
         ordducks.checkWhitelist(2, addresses[1]);
@@ -43,19 +46,15 @@ contract OrdinalDucksLaboratory is DSTestPlus {
         ordducks.checkTaprootAddress("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
     }
 
-    function testCurrentSupply() public {
-        require(ordducks.currentSupply() == 0, "currentSupply()");
-        hevm.warp(301);
+    function testTotalSupply() public {
+        require(ordducks.totalSupply() == 0, "totalSupply()");
+        hevm.warp(150);
         ordducks.whitelistAddress_(addresses[2], 2);
+        hevm.warp(301);
         hevm.prank(addresses[2]);
-        ordducks.safeMint();
-        require(ordducks.currentSupply() == 1, "currentSupply()");
+        ordducks.safeMint{ value: 100 gwei }();
+        require(ordducks.totalSupply() == 1, "totalSupply()");
     }
-
-    /*function testConcatenate() public view {
-        require(bytes32(keccak256(abi.encodePacked(ordducks.concatenate("test1", "test2")))) == 
-            bytes32(keccak256(abi.encodePacked("test1test2"))), "concatenate()");
-    }*/
 
     function testCheckWhitelist() public {
         ordducks.whitelistAddress_(addresses[2], 2);
@@ -98,7 +97,7 @@ contract OrdinalDucksLaboratory is DSTestPlus {
     function testGetBurnAddress() public {
         hevm.warp(100000);
         hevm.startPrank(addresses[3]);
-        uint256 tokenId = ordducks.safeMint();
+        uint256 tokenId = ordducks.safeMint{ value: 100 gwei }();
         ordducks.burn(tokenId, "bc1pmzfrwwndsqmk5yh69yjr5lfgfg4ev8c0tsc06e");
         hevm.stopPrank();
         require(bytes32(keccak256(abi.encodePacked(ordducks.getBurnAddress_(tokenId)))) == 
@@ -107,7 +106,7 @@ contract OrdinalDucksLaboratory is DSTestPlus {
 
     function testDevMint() public {
         hevm.prank(addresses[1]);
-        uint256 tokenId = ordducks.safeMint();
+        uint256 tokenId = ordducks.safeMint{ value: 100 gwei }();
         require(tokenId > 120 && tokenId < 151, "Dev mint range error");
     }
 
@@ -119,13 +118,13 @@ contract OrdinalDucksLaboratory is DSTestPlus {
 
     function testBurn() public {
         hevm.startPrank(addresses[1]);
-        uint256 tokenId = ordducks.safeMint();
+        uint256 tokenId = ordducks.safeMint{ value: 100 gwei }();
         ordducks.burn(tokenId, "bc1pmzfrwwndsqmk5yh69yjr5lfgfg4ev8c0tsc06e");
     }
 
     function testReburn() public {
         hevm.startPrank(addresses[1]);
-        uint256 tokenId = ordducks.safeMint();
+        uint256 tokenId = ordducks.safeMint{ value: 100 gwei }();
         ordducks.burn(tokenId, "bc1pmzfrwwndsqmk5yh69yjr5lfgfg4ev8c0tsc06e");
         ordducks.burn(tokenId, "bc1pmzfrwwndsqmk5yh69yjr5lfgfg4ev8c0tsc06f");
         hevm.stopPrank();
@@ -134,17 +133,17 @@ contract OrdinalDucksLaboratory is DSTestPlus {
     }
 
     function testTokenURI() public {
-        hevm.startPrank(addresses[1]);
-        uint256 tokenId = ordducks.safeMint();
+        hevm.prank(addresses[1]);
+        uint256 tokenId = ordducks.safeMint{ value: 100 gwei }();
         require(bytes32(keccak256(abi.encodePacked(ordducks.tokenURI(tokenId)))) == 
-            bytes32(keccak256(abi.encodePacked("https://test.com/", Strings.toString(tokenId), ".png"))));
+            bytes32(keccak256(abi.encodePacked("https://test.com/", Strings.toString(tokenId)))));
     }
 
     function testAuctionMint() public {
         hevm.prank(addresses[1]);
-        console.log(ordducks.safeMint());
+        console.log(ordducks.safeMint{ value: 100 gwei }());
         hevm.prank(addresses[0]);
-        console.log(ordducks.safeMint());
+        console.log(ordducks.safeMint{ value: 100 gwei }());
         console.log(ordducks.balanceOf(addresses[0]));
         require(ordducks.balanceOf(addresses[0]) == 29, "Auction mint balanceOf()");
     }
@@ -155,33 +154,34 @@ contract OrdinalDucksLaboratory is DSTestPlus {
         console.log(ordducks.safeMint());
         hevm.stopPrank();
         hevm.prank(addresses[0]);
-        console.log(ordducks.safeMint());
-        for (uint256 i = 1; i <= 4; ++i) {
-            hevm.deal(address(uint160(i)), 100 ether);
-            ordducks.whitelistAddress_(address(uint160(i)), 1);
-            hevm.prank(address(uint160(i)));
-            ordducks.safeMint();
+        console.log(ordducks.safeMint{ value: 100 gwei }());
+        for (uint256 i = 1; i < 104; i++) {
+            if (i >= 1 && i <= 4) {
+                ordducks.whitelistAddress_(address(uint160(i)), 1);
+            }
+            else if (i >= 5 && i <= 19) {
+                ordducks.whitelistAddress_(address(uint160(i)), 2);
+            }
+            else if (i >= 20 && i <= 64) {
+                ordducks.whitelistAddress_(address(uint160(i)), 1);
+            }
+            else if (i >= 65 && i < 105) {
+                ordducks.whitelistAddress_(address(uint160(i)), 3);
+            }
         }
-        for (uint256 i = 5; i <= 19; ++i) {
-            hevm.deal(address(uint160(i)), 100 ether);
-            ordducks.whitelistAddress_(address(uint160(i)), 2);
+        for (uint256 i = 1; i <= 4; i++) {
+            hevm.prank(address(uint160(i)));
+            ordducks.safeMint{ value: 100 gwei }();
+        }
+        for (uint256 i = 5; i <= 19; i++) {
             hevm.startPrank(address(uint160(i)));
-            ordducks.safeMint();
-            ordducks.safeMint();
+            ordducks.safeMint{ value: 100 gwei }();
+            ordducks.safeMint{ value: 100 gwei }();
             hevm.stopPrank();
         }
         for (uint256 i = 20; i <= 64; i++) {
-            hevm.deal(address(uint160(i)), 100 ether);
-            ordducks.whitelistAddress_(address(uint160(i)), 1);
             hevm.prank(address(uint160(i)));
-            ordducks.safeMint();
-        }
-        hevm.warp(4000);
-        for (uint256 i = 65; i < 105; i++) {
-            hevm.deal(address(uint160(i)), 100 ether);
-            ordducks.whitelistAddress_(address(uint160(i)), 3);
-            hevm.prank(address(uint160(i)));
-            ordducks.safeMint();
+            ordducks.safeMint{ value: 100 gwei }();
         }
     }
 }
