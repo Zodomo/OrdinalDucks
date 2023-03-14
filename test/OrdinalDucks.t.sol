@@ -12,12 +12,12 @@ contract OrdinalDucksLaboratory is DSTestPlus {
                 SETUP
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
-    OrdinalDucksTest ordducks;
+    OrdinalDucks ordducks;
     address[] addresses = [address(0xABCD), address(0xBEEF), address(0xCECE), address(0xDEED)];
 
     function setUp() public {
         hevm.warp(1);
-        ordducks = new OrdinalDucksTest(addresses[0], addresses[1], "https://test.com/", 300, 100 gwei);
+        ordducks = new OrdinalDucks(addresses[0], addresses[1], "https://test.com/", 300, 100 gwei);
         for (uint i; i < addresses.length; i++) {
             hevm.deal(addresses[i], 5 ether);
         }

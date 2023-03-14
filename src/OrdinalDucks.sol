@@ -10,7 +10,7 @@ import "openzeppelin-contracts/security/ReentrancyGuard.sol";
 /// @title An ERC721 contract that mints placeholder NFTs that a recipient can burn alongside providing a Bitcoin address for the team to manually send their ordinal to.
 /// @author Zodomo
 /// @notice This contract is designed with the idea in mind that the team would be manually managing sending ordinals to their recipients as to avoid using complicated technologies like the Emblem Vaults.
-contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
+contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 EVENTS & ERRORS
@@ -23,8 +23,9 @@ contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
     uint256 public immutable maxSupply;
+    uint256 public constant maxPerMint = 1;
     uint256 public wlTimestamp;
-    uint256 public mintPrice;
+    uint256 public price;
     mapping(uint256 => mapping(address => bool)) public whitelist;
     mapping(address => bool) public isWhitelisted;
     mapping(address => bool) public isPriceExempt;
@@ -98,8 +99,8 @@ contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
         address _dev,
         string memory _uri,
         uint256 _timestamp,
-        uint256 _mintPrice
-    ) ERC721("Ordinal Ducks Test", "ORDINALDUCKSTEST") payable {
+        uint256 _price
+    ) ERC721("Ordinal Ducks", "ORDINALDUCKS") payable {
         maxSupply = 150;
         whitelist[0][_auction] = true;
         whitelist[2][_dev] = true;
@@ -109,7 +110,7 @@ contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
         isPriceExempt[_dev] = true;
         baseURI = _uri;
         wlTimestamp = _timestamp;
-        mintPrice = _mintPrice;
+        price = _price;
     }
 
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,8 +138,8 @@ contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
     }
 
     // Return mint price for buildship interface
-    function viewMintPrice() public view returns (uint) {
-        return mintPrice;
+    function getPrice() public view returns (uint) {
+        return price;
     }
 
     // Return wallet mint cap for buildship interface
@@ -290,8 +291,8 @@ contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
     }
 
     // Change the mint price, locks after whitelist is active
-    function changeMintPrice_(uint256 _price) public wlOff onlyOwner {
-        mintPrice = _price;
+    function changePrice_(uint256 _price) public wlOff onlyOwner {
+        price = _price;
     }
 
     // Toggle price exemption for specified address
@@ -321,7 +322,7 @@ contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
     // Mint NFT token
     function mint() public mintable mintLimit nonReentrant payable returns (uint256) {
         if (!isPriceExempt[msg.sender]) {
-            require(msg.value >= mintPrice, "Payment not sufficient!");
+            require(msg.value >= price, "Payment not sufficient!");
         }
         return _mintRouter();
     }
@@ -351,4 +352,6 @@ contract OrdinalDucksTest is ERC721, Ownable, ReentrancyGuard {
         require(_tokenId > 0 && _tokenId <= maxSupply, "Token ID is out of range!");
         return super.tokenURI(_tokenId);
     }
+
+    receive() external payable {}
 }
