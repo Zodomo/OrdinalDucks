@@ -5,8 +5,6 @@ import "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import "openzeppelin-contracts/access/Ownable.sol";
 import "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
-// TODO: Implement mint costs
-
 /// @title An ERC721 contract that mints placeholder NFTs that a recipient can burn alongside providing a Bitcoin address for the team to manually send their ordinal to.
 /// @author Zodomo
 /// @notice This contract is designed with the idea in mind that the team would be manually managing sending ordinals to their recipients as to avoid using complicated technologies like the Emblem Vaults.
@@ -51,8 +49,8 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         if (whitelist[0][msg.sender]) { _; } // Auction WL mints
         else if (whitelist[1][msg.sender]) { _; } // One / OG WL mint
         else if (whitelist[2][msg.sender]) { _; } // Dev / Top D's 2 WL mints
-        else if (whitelist[3][msg.sender] && block.timestamp >= (wlTimestamp + 60 minutes)) { _; } // Waddler WL
-        else if (block.timestamp >= (wlTimestamp + 105 minutes)) { _; } // Decoy / General Mint
+        else if (whitelist[3][msg.sender] && block.timestamp >= wlTimestamp) { _; } // Waddler WL
+        else if (block.timestamp >= (wlTimestamp + 30 minutes)) { _; } // Decoy / General Mint
         else { revert("Mint conditions are not met!"); }
     }
 
@@ -61,7 +59,7 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         if (whitelist[0][msg.sender] && balanceOf(msg.sender) < 30) { _; } // Auction wallet
         else if (whitelist[2][msg.sender] && balanceOf(msg.sender) < 2) { _; } // Dev + Top D's
         else if ((whitelist[1][msg.sender] || whitelist[3][msg.sender]) && balanceOf(msg.sender) < 1) { _; } // One WL / Waddlers
-        else if (block.timestamp >= (wlTimestamp + 105 minutes) && balanceOf(msg.sender) < 1) { _; } // Everyone else after whitelist
+        else if (block.timestamp >= (wlTimestamp + 30 minutes) && balanceOf(msg.sender) < 1) { _; } // Everyone else after whitelist
         else { revert("Mint limitation hit!"); }
     }
 
@@ -155,6 +153,11 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         return whitelist[_tier][_address];
     }
 
+    // Retrieve burner's Bitcoin address to receive their respective inscription
+    function getBurnAddress(uint256 _tokenId) public view returns (string memory) {
+        return _burnAddress[_tokenId];
+    }
+
     /*//////////////////////////////////////////////////////////////////////////////////////////////////
                 INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
@@ -185,10 +188,10 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
 
     // Randomize token ID, attempt 10 runs before locating available ID
     function _randomId() internal view returns (uint256) {
-        uint256 index;
         for (uint256 i; i < 10;) {
-            index = uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty, msg.sender, i))) % (121);
-            if (_ownerOf(index) == address(0) && index > 0 && index <= 150) {
+            uint256 index = uint256(keccak256(abi.encodePacked(
+                block.timestamp, blockhash(block.number - 1), block.difficulty, msg.sender, i))) % (121);
+            if (_ownerOf(index) == address(0) && index > 0 && index <= 120) {
                 return index;
             }
             unchecked { ++i; }
@@ -247,8 +250,11 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
     // Assign an address to a specific whitelist tier
     // Calling on an address a second time will remove whitelist
     function whitelistAddress_(address _address, uint256 _tier) public wlOff onlyOwner {
+        // Deny changes to _devWallet
+        require(_address != _devWallet, "Cannot change dev wallet WL status!");
         // Retrieve current whitelist status
         bool wlStatus = whitelist[_tier][_address];
+
         // If tier 0 (auction) is set, change auction address
         if (_tier == 0) {
             _changeAuctionWallet(_address);
@@ -285,11 +291,6 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
         }
     }
 
-    // Retrieve burner's Bitcoin address to receive their respective inscription
-    function getBurnAddress_(uint256 _tokenId) public view onlyOwner returns (string memory) {
-        return _burnAddress[_tokenId];
-    }
-
     // Change the mint price, locks after whitelist is active
     function changePrice_(uint256 _price) public wlOff onlyOwner {
         price = _price;
@@ -309,8 +310,8 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
     }
 
     // Withdraw function
-    function withdraw_(address _address) public onlyOwner {
-        address payable payee = payable(_address);
+    function withdraw_() public onlyOwner {
+        address payable payee = payable(_auctionWallet);
         (bool success,) = payee.call{ value: address(this).balance }("");
         require(success, "Withdraw failed!");
     }
@@ -320,7 +321,8 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////////////////////////////////////////*/
 
     // Mint NFT token
-    function mint() public mintable mintLimit nonReentrant payable returns (uint256) {
+    // The _nTokens parameter is deliberately unused but is included to satisfy Buildship button requirements
+    function mint(uint256 _nTokens) public mintable mintLimit nonReentrant payable returns (uint256) {
         if (!isPriceExempt[msg.sender]) {
             require(msg.value >= price, "Payment not sufficient!");
         }
@@ -354,4 +356,5 @@ contract OrdinalDucks is ERC721, Ownable, ReentrancyGuard {
     }
 
     receive() external payable {}
+    fallback() external payable {}
 }
